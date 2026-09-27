@@ -23,7 +23,8 @@ ollama pull scb10x/typhoon-ocr1.5-3b
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt        # dependency พื้นฐาน (เบา)
+pip install -r requirements-ml.txt     # + OCR/embedding/search/Gemini (หนัก, ใช้ตั้งแต่ Issue #2)
 ```
 
 ### 3. ตั้งค่า
