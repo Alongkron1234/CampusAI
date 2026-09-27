@@ -1,0 +1,4 @@
+# Dependency พื้นฐานที่ทุก Issue ต้องใช้ (เบา ติดตั้งเร็ว)
+python-dotenv>=1.0
+pytest>=8.0
+ruff>=0.6
