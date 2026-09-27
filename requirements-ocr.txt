@@ -1,0 +1,6 @@
+# Dependency สำหรับ ingestion (Issue #2, #3): อ่าน PDF + OCR
+# เบากว่า requirements-ml.txt (ไม่มี torch/sentence-transformers)
+-r requirements.txt
+
+pdfplumber>=0.11
+typhoon-ocr>=0.4.1
