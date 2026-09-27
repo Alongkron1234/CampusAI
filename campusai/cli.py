@@ -7,6 +7,8 @@
 import argparse
 import sys
 
+from campusai.ingest.check import add_check_args, run_check
+
 
 def _not_implemented(name: str):
     def _run(args: argparse.Namespace) -> int:
@@ -35,7 +37,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     for name, help_text in commands.items():
         sub = subparsers.add_parser(name, help=help_text)
-        sub.set_defaults(func=_not_implemented(name))
+        if name == "check":
+            add_check_args(sub)
+            sub.set_defaults(func=run_check)
+        else:
+            sub.set_defaults(func=_not_implemented(name))
 
     return parser
 
