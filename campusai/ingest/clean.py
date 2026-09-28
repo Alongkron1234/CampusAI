@@ -25,9 +25,11 @@ _SARA_AA = "า"  # า
 # เช่น "(Handwritten signature)", "(University logo)", "(Signature)"
 _FIGURE_PLACEHOLDER_RE = re.compile(r"^\s*\([A-Za-z][A-Za-z ]*\)\s*$", re.MULTILINE)
 
-# บรรทัดที่เป็นเลขหน้าล้วน ๆ เช่น "- 3 -", "หน้า 3", "3/10"
+# บรรทัดที่เป็นเลขหน้าล้วน ๆ เช่น "- 3 -", "หน้า 3", "3/10", "<page_number>5/30</page_number>"
+# แบบหลังคือแท็กที่ Typhoon OCR v1.5 ใส่มาให้เอง
 _PAGE_NUMBER_RE = re.compile(
-    r"^\s*(-\s*\d+\s*-|หน้า\s*\d+|\d+\s*/\s*\d+)\s*$", re.MULTILINE
+    r"^\s*(-\s*\d+\s*-|หน้า\s*\d+|\d+\s*/\s*\d+|<page_number>.*?</page_number>)\s*$",
+    re.MULTILINE,
 )
 
 _THAI_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")

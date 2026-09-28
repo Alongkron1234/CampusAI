@@ -97,6 +97,15 @@ def test_remove_page_numbers_removes_slash_style():
     assert "3/10" not in result
 
 
+def test_remove_page_numbers_removes_typhoon_page_number_tag():
+    # เคสจริงจาก Typhoon OCR: <page_number>5/30</page_number>
+    text = "เนื้อหา\n<page_number>5/30</page_number>\nเนื้อหาต่อ"
+    result = remove_page_numbers(text)
+    assert "<page_number>" not in result
+    assert "เนื้อหา" in result
+    assert "เนื้อหาต่อ" in result
+
+
 def test_remove_page_numbers_removes_word_style():
     text = "เนื้อหา\nหน้า 3\nเนื้อหาต่อ"
     result = remove_page_numbers(text)

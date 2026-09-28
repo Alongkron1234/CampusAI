@@ -4,3 +4,5 @@
 
 pdfplumber>=0.11
 typhoon-ocr>=0.4.1
+requests>=2.31
+google-genai>=2.0

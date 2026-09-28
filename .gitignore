@@ -22,4 +22,5 @@ eval/results/
 .DS_Store
 .vscode/
 .idea/
+.claude/
 docs/PLAN.md

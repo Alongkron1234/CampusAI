@@ -1,7 +1,7 @@
-# Dependency หนัก (embedding, vector/keyword search, Gemini) — ใช้ตั้งแต่ Issue #5 เป็นต้นไป
+# Dependency หนัก (embedding, vector/keyword search) — ใช้ตั้งแต่ Issue #5 เป็นต้นไป
+# google-genai อยู่ใน requirements-ocr.txt แล้ว (ใช้ได้ทั้งตอน OCR backend=gemini และตอน generation)
 -r requirements-ocr.txt
 
-google-genai>=2.0
 qdrant-client>=1.12
 rank-bm25>=0.2.2
 pythainlp>=5.0
