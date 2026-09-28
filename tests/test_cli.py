@@ -11,8 +11,8 @@ def test_help_lists_all_commands(capsys):
 
 
 def test_unimplemented_command_returns_nonzero(capsys):
-    # "check" implement แล้วตั้งแต่ Issue #2 จึงใช้ "ingest" (ยังไม่ implement) แทน
-    exit_code = main(["ingest"])
+    # "check" และ "ingest" implement แล้วตั้งแต่ Issue #2/#3 จึงใช้ "index" (ยังไม่ implement) แทน
+    exit_code = main(["index"])
     assert exit_code == 1
     captured = capsys.readouterr()
-    assert "ingest" in captured.out
+    assert "index" in captured.out
