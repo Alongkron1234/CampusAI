@@ -8,6 +8,7 @@ import argparse
 import sys
 
 from campusai.ingest.check import add_check_args, run_check
+from campusai.ingest.pipeline import add_ingest_args, run_ingest
 
 
 def _not_implemented(name: str):
@@ -40,6 +41,9 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "check":
             add_check_args(sub)
             sub.set_defaults(func=run_check)
+        elif name == "ingest":
+            add_ingest_args(sub)
+            sub.set_defaults(func=run_ingest)
         else:
             sub.set_defaults(func=_not_implemented(name))
 
