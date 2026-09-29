@@ -11,8 +11,8 @@ def test_help_lists_all_commands(capsys):
 
 
 def test_unimplemented_command_returns_nonzero(capsys):
-    # "check", "ingest", "index" implement แล้ว จึงใช้ "search" (ยังไม่ implement) แทน
-    exit_code = main(["search"])
+    # check/ingest/index/search/eval implement แล้ว จึงใช้ "ask" (ยังไม่ implement, Issue #7) แทน
+    exit_code = main(["ask"])
     assert exit_code == 1
     captured = capsys.readouterr()
-    assert "search" in captured.out
+    assert "ask" in captured.out
