@@ -128,6 +128,9 @@ def _call_gemini_with_retry(prompt: str) -> str:
         return _call_model_with_retry(prompt, config.GEMINI_FALLBACK_MODEL)
 
 
+# Ollama ปล่อยโมเดลออกจากหน่วยความจำหลังว่าง 5 นาที (ค่าเริ่มต้น) ยืดไว้ให้ถามต่อได้โดยไม่ต้องโหลดใหม่
+OLLAMA_KEEP_ALIVE = "30m"
+
 # บางโมเดล (เช่น qwen3) พิมพ์ขั้นตอนคิดใน <think>...</think> ก่อนคำตอบ ต้องตัดออก
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
@@ -145,6 +148,7 @@ def _call_ollama(prompt: str) -> str:
             {"role": "user", "content": prompt},
         ],
         "options": {"temperature": TEMPERATURE, "num_ctx": config.OLLAMA_LLM_NUM_CTX},
+        "keep_alive": OLLAMA_KEEP_ALIVE,
         "stream": False,
     }
     response = requests.post(
@@ -154,6 +158,20 @@ def _call_ollama(prompt: str) -> str:
     )
     response.raise_for_status()
     return _THINK_RE.sub("", response.json()["message"]["content"])
+
+
+def warm_up() -> None:
+    """โหลดโมเดล Ollama เข้าหน่วยความจำไว้ก่อน (ส่ง messages ว่าง = โหลดอย่างเดียว ไม่สร้างคำตอบ)
+
+    ไม่งั้นคำถามแรกต้องรอโหลดโมเดลหลายวินาทีเพิ่ม ใช้กับ Gemini ไม่ได้/ไม่จำเป็น
+    """
+    if config.LLM_BACKEND != "ollama":
+        return
+    requests.post(
+        f"{config.OLLAMA_NATIVE_URL}/api/chat",
+        json={"model": config.OLLAMA_LLM_MODEL, "messages": [], "keep_alive": OLLAMA_KEEP_ALIVE},
+        timeout=config.OLLAMA_LLM_TIMEOUT_SECONDS,
+    ).raise_for_status()
 
 
 def call_llm(prompt: str) -> str:

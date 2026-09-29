@@ -3,8 +3,9 @@
 import argparse
 
 from campusai import config
-from campusai.generation.answer import Answer, answer_question, source_label
+from campusai.generation.answer import Answer, answer_question, source_label, warm_up
 from campusai.retrieval import bm25, vector_store
+from campusai.retrieval.embedder import get_model
 from campusai.retrieval.hybrid import Retriever
 from campusai.retrieval.indexer import load_chunks
 
@@ -61,7 +62,15 @@ def run_chat(args: argparse.Namespace) -> int:
     if retriever is None:
         return 1
 
-    print(f"CampusAI chat — {CHAT_HELP}")
+    # โหลดโมเดลทั้งหมดตั้งแต่เปิด chat คำถามแรกจะได้ไม่ช้ากว่าข้ออื่น
+    print("[campusai] กำลังโหลดโมเดล...")
+    get_model()
+    try:
+        warm_up()
+    except Exception as exc:  # noqa: BLE001 - โหลดล่วงหน้าไม่สำเร็จไม่เป็นไร ถามแล้วค่อยแจ้ง error
+        print(f"[campusai] โหลด LLM ล่วงหน้าไม่สำเร็จ: {exc}")
+
+    print(f"CampusAI chat ({config.LLM_BACKEND}) — {CHAT_HELP}")
     last: Answer | None = None
     while True:
         try:

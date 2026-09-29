@@ -196,6 +196,36 @@ def test_ollama_backend_strips_think_block(monkeypatch):
     assert len(result.sources) == 1  # [2] ในส่วน think ต้องไม่นับเป็นแหล่งอ้างอิง
 
 
+def test_ollama_keeps_model_loaded_between_questions(monkeypatch):
+    monkeypatch.setattr(answer.config, "LLM_BACKEND", "ollama")
+    sent = {}
+
+    def _post(url, json, timeout):
+        sent.update(json)
+        return _FakeResponse("ตอบ [1]")
+
+    monkeypatch.setattr(answer.requests, "post", _post)
+    answer.generate_answer("q", [_r("1")])
+    assert sent["keep_alive"] == answer.OLLAMA_KEEP_ALIVE
+
+
+def test_warm_up_loads_ollama_model_without_generating(monkeypatch):
+    monkeypatch.setattr(answer.config, "LLM_BACKEND", "ollama")
+    sent = {}
+
+    def _post(url, json, timeout):
+        sent.update(json)
+        return _FakeResponse("")
+
+    monkeypatch.setattr(answer.requests, "post", _post)
+    answer.warm_up()
+    assert sent["messages"] == []
+
+
+def test_warm_up_does_nothing_for_gemini():
+    answer.warm_up()  # autouse fixture ตั้งเป็น gemini และจะ fail ถ้ามีการเรียก requests.post
+
+
 def test_answer_question_uses_hybrid_top_k(monkeypatch):
     _mock_gemini(monkeypatch, "ตอบ [1]")
     calls = []
