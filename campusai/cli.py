@@ -19,6 +19,21 @@ def _run_index(args: argparse.Namespace) -> int:
     return run_index(args)
 
 
+def _run_search(args: argparse.Namespace) -> int:
+    from campusai.retrieval.search_cli import run_search
+
+    return run_search(args)
+
+
+def _run_eval(args: argparse.Namespace) -> int:
+    from campusai.evaluation.retrieval_eval import run_eval_retrieval
+
+    if args.target == "retrieval":
+        return run_eval_retrieval(args)
+    print(f"[campusai] eval {args.target!r} ยังไม่ได้ implement (Issue #8)")
+    return 1
+
+
 def _not_implemented(name: str):
     def _run(args: argparse.Namespace) -> int:
         print(f"[campusai] คำสั่ง '{name}' ยังไม่ได้ implement (ดู docs/PLAN.md)")
@@ -54,6 +69,13 @@ def build_parser() -> argparse.ArgumentParser:
             sub.set_defaults(func=run_ingest)
         elif name == "index":
             sub.set_defaults(func=_run_index)
+        elif name == "search":
+            sub.add_argument("query", help="คำถามที่จะค้นหา")
+            sub.add_argument("-k", "--top-k", type=int, default=5, help="จำนวนผลต่อวิธี (ค่าเริ่มต้น 5)")
+            sub.set_defaults(func=_run_search)
+        elif name == "eval":
+            sub.add_argument("target", choices=["retrieval", "answers"], help="สิ่งที่จะวัดผล")
+            sub.set_defaults(func=_run_eval)
         else:
             sub.set_defaults(func=_not_implemented(name))
 
