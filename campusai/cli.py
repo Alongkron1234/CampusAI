@@ -25,6 +25,25 @@ def _run_search(args: argparse.Namespace) -> int:
     return run_search(args)
 
 
+def _run_ask(args: argparse.Namespace) -> int:
+    from campusai.generation.ask_cli import run_ask
+
+    return run_ask(args)
+
+
+def _run_chat(args: argparse.Namespace) -> int:
+    from campusai.generation.ask_cli import run_chat
+
+    return run_chat(args)
+
+
+def _add_top_k_arg(parser: argparse.ArgumentParser) -> None:
+    # ค่าเดียวกับ generation.answer.TOP_K_CONTEXT (ไม่ import ตรง ๆ เพื่อให้ --help ไม่ต้องโหลด genai)
+    parser.add_argument(
+        "-k", "--top-k", type=int, default=5, help="จำนวน chunk ที่ส่งให้ LLM (ค่าเริ่มต้น 5)"
+    )
+
+
 def _run_eval(args: argparse.Namespace) -> int:
     from campusai.evaluation.retrieval_eval import run_eval_retrieval
 
@@ -73,6 +92,13 @@ def build_parser() -> argparse.ArgumentParser:
             sub.add_argument("query", help="คำถามที่จะค้นหา")
             sub.add_argument("-k", "--top-k", type=int, default=5, help="จำนวนผลต่อวิธี (ค่าเริ่มต้น 5)")
             sub.set_defaults(func=_run_search)
+        elif name == "ask":
+            sub.add_argument("question", help="คำถาม")
+            _add_top_k_arg(sub)
+            sub.set_defaults(func=_run_ask)
+        elif name == "chat":
+            _add_top_k_arg(sub)
+            sub.set_defaults(func=_run_chat)
         elif name == "eval":
             sub.add_argument("target", choices=["retrieval", "answers"], help="สิ่งที่จะวัดผล")
             sub.set_defaults(func=_run_eval)
