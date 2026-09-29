@@ -73,10 +73,18 @@ def format_report(reports: dict[str, dict[str, dict[str, float]]]) -> str:
 
 
 def run_eval_retrieval(args: argparse.Namespace) -> int:
-    from campusai.evaluation.validate_questions import load_questions
+    from campusai.evaluation.validate_questions import load_eval_questions
     from campusai.retrieval import bm25, vector_store
     from campusai.retrieval.hybrid import Retriever
     from campusai.retrieval.indexer import load_chunks
+
+    try:
+        questions = load_eval_questions(args.questions, allow_test_set=args.allow_test_set)
+    except ValueError as exc:
+        print(f"[campusai] {exc}")
+        return 1
+    if args.limit:
+        questions = questions[: args.limit]
 
     if not config.CHUNKS_PATH.exists():
         print(
@@ -87,8 +95,6 @@ def run_eval_retrieval(args: argparse.Namespace) -> int:
     retriever = Retriever(
         client=vector_store.get_client(), bm25_index=bm25.build_index(load_chunks())
     )
-    questions = load_questions()
-
     reports = {
         "vector": evaluate(questions, retriever.vector),
         "bm25": evaluate(questions, retriever.keyword),

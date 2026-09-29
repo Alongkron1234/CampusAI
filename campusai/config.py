@@ -18,6 +18,10 @@ CHUNKS_PATH = PROCESSED_DIR / "chunks.jsonl"
 EVAL_DIR = ROOT / "eval"
 EVAL_QUESTIONS_PATH = EVAL_DIR / "questions.jsonl"
 EVAL_RESULTS_DIR = EVAL_DIR / "results"
+# test set ล็อกไว้ วัดครั้งเดียวหลังปรับจูนเสร็จ (Issue #9) คำสั่ง eval ต้องใส่ --allow-test-set ถึงจะยอมใช้
+EVAL_TEST_QUESTIONS_PATH = EVAL_DIR / "test_questions.jsonl"
+# cache คำตอบ/คะแนนของ eval answers ต่อข้อ รันซ้ำหรือหยุดกลางทางแล้วรันต่อไม่ต้องเรียก LLM ใหม่
+ANSWER_EVAL_CACHE_DIR = DATA_DIR / "cache" / "answer_eval"
 
 # ----- OCR -----
 # เลือก backend ได้ 2 แบบ ผ่าน .env (เหมือนที่ QDRANT_MODE เลือก local/cloud ได้):
