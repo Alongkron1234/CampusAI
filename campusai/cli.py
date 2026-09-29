@@ -19,6 +19,12 @@ def _run_index(args: argparse.Namespace) -> int:
     return run_index(args)
 
 
+def _run_remove(args: argparse.Namespace) -> int:
+    from campusai.retrieval.indexer import run_remove
+
+    return run_remove(args)
+
+
 def _run_search(args: argparse.Namespace) -> int:
     from campusai.retrieval.search_cli import run_search
 
@@ -72,6 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
         "check": "ตรวจ PDF รายหน้าว่าต้อง OCR หรือไม่ (Issue #2)",
         "ingest": "แปลง PDF -> chunks.jsonl (Issue #2, #3)",
         "index": "สร้าง vector index + BM25 index จาก chunks.jsonl (Issue #5)",
+        "remove": "ลบเอกสารออกจาก chunks.jsonl และ index (Issue #10a)",
         "search": "ค้นหา chunk ที่เกี่ยวข้องกับคำถาม (Issue #6)",
         "ask": "ถามคำถามครั้งเดียวแล้วรับคำตอบ (Issue #7)",
         "chat": "โหมดถาม-ตอบต่อเนื่องใน terminal (Issue #7)",
@@ -87,7 +94,17 @@ def build_parser() -> argparse.ArgumentParser:
             add_ingest_args(sub)
             sub.set_defaults(func=run_ingest)
         elif name == "index":
+            sub.add_argument(
+                "--only", nargs="+", metavar="ไฟล์",
+                help="index ใหม่เฉพาะเอกสารที่ระบุ (ไม่ใส่ = สร้างใหม่ทั้งหมด)",
+            )
             sub.set_defaults(func=_run_index)
+        elif name == "remove":
+            sub.add_argument("docs", nargs="+", metavar="ไฟล์", help="ชื่อไฟล์ .pdf ที่จะลบ")
+            sub.add_argument(
+                "--delete-pdf", action="store_true", help="ลบไฟล์ PDF ต้นฉบับใน data/raw ด้วย"
+            )
+            sub.set_defaults(func=_run_remove)
         elif name == "search":
             sub.add_argument("query", help="คำถามที่จะค้นหา")
             sub.add_argument("-k", "--top-k", type=int, default=5, help="จำนวนผลต่อวิธี (ค่าเริ่มต้น 5)")

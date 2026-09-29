@@ -193,6 +193,7 @@ def ocr_pages(
     page_numbers: list[int],
     force: bool = False,
     on_progress: Callable[[int, int, bool], None] | None = None,
+    skip_failed: bool = False,
 ) -> dict[int, str]:
     """OCR หลายหน้าของไฟล์เดียวกัน ทีละหน้า
 
@@ -201,6 +202,8 @@ def ocr_pages(
         force: True = OCR ใหม่ทุกหน้าแม้มี cache อยู่แล้ว
         on_progress: callback (หน้าที่เท่าไร, ทั้งหมดกี่หน้า, ใช้ cache หรือเรียกโมเดลจริง)
                      เรียกทุกครั้งที่ทำหน้าหนึ่งเสร็จ ไว้แสดงความคืบหน้า
+        skip_failed: True = หน้าที่ OCR ไม่สำเร็จ (retry ครบแล้ว) ให้ข้ามไปทำหน้าถัดไป
+                     แทนที่จะหยุดทั้งไฟล์ หน้าที่ข้ามจะไม่อยู่ใน dict ที่คืน (ผู้เรียกเช็คเองได้)
 
     Returns:
         dict ที่ key คือเลขหน้า, value คือข้อความ markdown ที่ได้
@@ -210,7 +213,12 @@ def ocr_pages(
 
     for i, page_number in enumerate(page_numbers, start=1):
         was_cached = cache_path_for(pdf_path, page_number).exists() and not force
-        results[page_number] = ocr_page(pdf_path, page_number, force=force)
+        try:
+            results[page_number] = ocr_page(pdf_path, page_number, force=force)
+        except RuntimeError as exc:
+            if not skip_failed:
+                raise
+            print(f"    [ocr] ⚠ ข้ามหน้า {page_number}: {exc}")
 
         if on_progress:
             on_progress(i, total, was_cached)

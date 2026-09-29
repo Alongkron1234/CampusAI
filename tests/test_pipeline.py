@@ -2,7 +2,7 @@ import json
 
 from campusai import config
 from campusai.cli import main
-from campusai.ingest import pipeline
+from campusai.ingest import pipeline, registry
 from campusai.ingest.chunker import Chunk
 from campusai.ingest.pdf_text import PageResult
 
@@ -35,13 +35,13 @@ def test_ingest_single_file_merges_plain_text_and_ocr_result(tmp_path, monkeypat
     monkeypatch.setattr(
         pipeline,
         "ocr_pages",
-        lambda path, page_numbers, force=False, on_progress=None: {
+        lambda path, page_numbers, force=False, on_progress=None, skip_failed=False: {
             2: "ข้อ 2 เนื้อหาจาก OCR"
         },
     )
 
-    chunks = pipeline.ingest_single_file(pdf_path)
-    all_text = " ".join(c.text for c in chunks)
+    result = pipeline.ingest_single_file(pdf_path)
+    all_text = " ".join(c.text for c in result.chunks)
 
     assert "เนื้อหาปกติจาก pdfplumber" in all_text
     assert "เนื้อหาจาก OCR" in all_text
@@ -57,17 +57,17 @@ def test_ingest_single_file_only_calls_ocr_for_flagged_pages(tmp_path, monkeypat
 
     received_page_numbers = []
 
-    def _spy_ocr_pages(path, page_numbers, force=False, on_progress=None):
+    def _spy_ocr_pages(path, page_numbers, force=False, on_progress=None, skip_failed=False):
         received_page_numbers.append(page_numbers)
         return {}
 
     monkeypatch.setattr(pipeline, "ocr_pages", _spy_ocr_pages)
 
-    chunks = pipeline.ingest_single_file(pdf_path)
+    result = pipeline.ingest_single_file(pdf_path)
 
     # ไม่มีหน้าไหน needs_ocr=True เลย -> ต้องส่ง list ว่างเข้า ocr_pages (ไม่มีหน้าไหนถูกส่งไป OCR จริง)
     assert received_page_numbers == [[]]
-    assert len(chunks) == 2
+    assert len(result.chunks) == 2
 
 
 def test_write_chunks_is_idempotent_and_preserves_other_docs(tmp_path, monkeypatch):
@@ -124,9 +124,10 @@ def test_run_ingest_only_flag_filters_to_selected_file(tmp_path, monkeypatch):
 
     processed_docs = []
 
-    def _fake_ingest_single_file(pdf_path, force_ocr=False, verbose=False):
+    def _fake_ingest_single_file(pdf_path, force_ocr=False, verbose=False, on_progress=None):
         processed_docs.append(pdf_path.name)
-        return [Chunk(id="x", doc=pdf_path.name, clause=None, chapter=None, text="เนื้อหา")]
+        chunk = Chunk(id="x", doc=pdf_path.name, clause=None, chapter=None, text="เนื้อหา")
+        return pipeline.IngestResult(doc=pdf_path.name, chunks=[chunk], pages=1)
 
     monkeypatch.setattr(pipeline, "ingest_single_file", _fake_ingest_single_file)
 
@@ -134,3 +135,110 @@ def test_run_ingest_only_flag_filters_to_selected_file(tmp_path, monkeypatch):
 
     assert exit_code == 0
     assert processed_docs == ["keep.pdf"]
+
+
+# ----- Issue #10a: ข้ามหน้าที่พัง, บันทึกทีละไฟล์, ทะเบียน, ลบเอกสาร -----
+
+
+def _use_tmp_dirs(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(config, "PROCESSED_DIR", tmp_path / "processed")
+    monkeypatch.setattr(config, "CHUNKS_PATH", tmp_path / "processed" / "chunks.jsonl")
+
+
+def _fake_result(pdf_path, force_ocr=False, verbose=False, on_progress=None):
+    chunk = Chunk(id=f"{pdf_path.stem}_1", doc=pdf_path.name, clause="ข้อ 1", chapter=None,
+                  text="เนื้อหา")
+    return pipeline.IngestResult(doc=pdf_path.name, chunks=[chunk], pages=1)
+
+
+def test_failed_ocr_page_is_skipped_and_reported(tmp_path, monkeypatch):
+    pdf_path = _fake_pdf(tmp_path)
+    fake_pages = [
+        PageResult(page_number=1, text="", needs_ocr=True, reason="สแกน"),
+        PageResult(page_number=2, text="", needs_ocr=True, reason="สแกน"),
+    ]
+    monkeypatch.setattr(pipeline, "extract_pages", lambda path: fake_pages)
+    received = {}
+
+    def _ocr(path, page_numbers, force=False, on_progress=None, skip_failed=False):
+        received["skip_failed"] = skip_failed
+        return {1: "ข้อ 1 ได้จาก OCR"}  # หน้า 2 OCR ไม่สำเร็จ
+
+    monkeypatch.setattr(pipeline, "ocr_pages", _ocr)
+    result = pipeline.ingest_single_file(pdf_path)
+
+    assert received["skip_failed"] is True
+    assert result.failed_pages == [2]
+    assert result.ocr_pages == [1, 2]
+    assert "ได้จาก OCR" in result.chunks[0].text
+
+
+def test_ingest_reports_progress_stages(tmp_path, monkeypatch):
+    pdf_path = _fake_pdf(tmp_path)
+    monkeypatch.setattr(
+        pipeline, "extract_pages",
+        lambda path: [PageResult(page_number=1, text="", needs_ocr=True, reason="สแกน")],
+    )
+
+    def _ocr(path, page_numbers, force=False, on_progress=None, skip_failed=False):
+        on_progress(1, 1, False)
+        return {1: "ข้อ 1 ก"}
+
+    monkeypatch.setattr(pipeline, "ocr_pages", _ocr)
+    events = []
+    pipeline.ingest_single_file(pdf_path, on_progress=lambda *e: events.append(e))
+
+    assert ("ocr", 1, 1) in events
+    assert [e[0] for e in events][0] == "extract"
+    assert events[-1] == ("chunk", 1, 1)
+
+
+def test_process_file_writes_chunks_and_registry(tmp_path, monkeypatch):
+    _use_tmp_dirs(tmp_path, monkeypatch)
+    pdf_path = _fake_pdf(tmp_path, "a.pdf")
+    monkeypatch.setattr(pipeline, "ingest_single_file", _fake_result)
+
+    pipeline.process_file(pdf_path)
+
+    assert json.loads(config.CHUNKS_PATH.read_text("utf-8"))["doc"] == "a.pdf"
+    record = registry.load_registry()["a.pdf"]
+    assert record.chunks == 1
+    assert registry.find_by_hash(record.sha256) == "a.pdf"
+
+
+def test_one_broken_file_does_not_stop_others(tmp_path, monkeypatch, capsys):
+    _use_tmp_dirs(tmp_path, monkeypatch)
+    _fake_pdf(tmp_path, "bad.pdf")
+    _fake_pdf(tmp_path, "good.pdf")
+
+    def _ingest(pdf_path, *args, **kwargs):
+        if pdf_path.name == "bad.pdf":
+            raise RuntimeError("PDF เสีย")
+        return _fake_result(pdf_path)
+
+    monkeypatch.setattr(pipeline, "ingest_single_file", _ingest)
+
+    assert main(["ingest"]) == 1  # มีไฟล์พัง ต้องแจ้งว่าไม่สำเร็จทั้งหมด
+    assert "bad.pdf" in capsys.readouterr().out
+    lines = config.CHUNKS_PATH.read_text("utf-8").splitlines()
+    saved_docs = {json.loads(line)["doc"] for line in lines}
+    assert saved_docs == {"good.pdf"}  # ไฟล์ที่ดียังถูกบันทึก
+
+
+def test_remove_document_clears_chunks_markdown_and_registry(tmp_path, monkeypatch):
+    _use_tmp_dirs(tmp_path, monkeypatch)
+    monkeypatch.setattr(pipeline, "ingest_single_file", _fake_result)
+    for name in ("a.pdf", "b.pdf"):
+        pipeline.process_file(_fake_pdf(tmp_path, name))
+
+    pipeline.remove_document("a.pdf")
+
+    rows = [json.loads(line) for line in config.CHUNKS_PATH.read_text("utf-8").splitlines()]
+    assert {r["doc"] for r in rows} == {"b.pdf"}
+    assert not (config.PROCESSED_DIR / "a.md").exists()
+    assert set(registry.load_registry()) == {"b.pdf"}
+    assert (tmp_path / "a.pdf").exists()  # ไม่ลบ PDF ถ้าไม่สั่ง
+
+    pipeline.remove_document("b.pdf", delete_pdf=True)
+    assert not (tmp_path / "b.pdf").exists()

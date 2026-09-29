@@ -12,7 +12,15 @@ import uuid
 from dataclasses import dataclass
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import (
+    Distance,
+    FieldCondition,
+    Filter,
+    FilterSelector,
+    MatchValue,
+    PointStruct,
+    VectorParams,
+)
 
 from campusai import config
 from campusai.ingest.chunker import Chunk
@@ -82,6 +90,22 @@ def index_chunks(client: QdrantClient, chunks: list[Chunk], vectors: list[list[f
         for chunk, vector in zip(chunks, vectors, strict=True)
     ]
     client.upsert(collection_name=config.QDRANT_COLLECTION, points=points)
+
+def delete_doc(client: QdrantClient, doc: str) -> None:
+    """ลบ vector ทุกชิ้นของเอกสารนี้ (กรองจาก payload "doc")
+
+    ใช้ตอน index เอกสารเดิมซ้ำ: ต้องลบของเก่าก่อน เพราะถ้าเอกสารใหม่มี chunk น้อยกว่าเดิม
+    upsert อย่างเดียวจะทับแค่ id ที่ซ้ำ chunk เก่าที่เกินมาจะค้างอยู่
+    """
+    if not client.collection_exists(config.QDRANT_COLLECTION):
+        return
+    client.delete(
+        collection_name=config.QDRANT_COLLECTION,
+        points_selector=FilterSelector(
+            filter=Filter(must=[FieldCondition(key="doc", match=MatchValue(value=doc))])
+        ),
+    )
+
 
 # หา chunk ที่ใกล้ query_vector ที่สุด top_k อันดับ เรียงจากใกล้ไปไกล (ส่งคำถามไปได้ ผลกลัยมา)
 def search(client: QdrantClient, query_vector: list[float], top_k: int = 5) -> list[SearchResult]:
