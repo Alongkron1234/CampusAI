@@ -11,8 +11,8 @@ def test_help_lists_all_commands(capsys):
 
 
 def test_unimplemented_command_returns_nonzero(capsys):
-    # check/ingest/index/search/eval implement แล้ว จึงใช้ "ask" (ยังไม่ implement, Issue #7) แทน
-    exit_code = main(["ask"])
+    # ทุกคำสั่ง implement แล้ว เหลือ "eval answers" (Issue #8)
+    exit_code = main(["eval", "answers"])
     assert exit_code == 1
     captured = capsys.readouterr()
-    assert "ask" in captured.out
+    assert "answers" in captured.out

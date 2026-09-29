@@ -15,9 +15,20 @@ def _select_device() -> str:
     return "cpu"
 
 
+def _silence_model_loading() -> None:
+    """ปิดคำเตือน HF_TOKEN และแถบ "Loading weights" ที่ขึ้นทุกครั้งที่โหลดโมเดล (ไม่มีผลต่อการทำงาน)"""
+    from huggingface_hub.utils import logging as hf_logging
+    from transformers.utils import logging as tf_logging
+
+    hf_logging.set_verbosity_error()
+    tf_logging.set_verbosity_error()
+    tf_logging.disable_progress_bar()
+
+
 def get_model() -> SentenceTransformer:
     global _model
     if _model is None:
+        _silence_model_loading()
         _model = SentenceTransformer(config.EMBED_MODEL, device=_select_device())
     return _model
 

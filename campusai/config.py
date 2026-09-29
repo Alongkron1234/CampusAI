@@ -55,6 +55,19 @@ QDRANT_URL = os.getenv("QDRANT_URL", "")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", "")
 QDRANT_COLLECTION = "campusai"
 
-# ----- Generation (Gemini API) -----
+# ----- Generation: LLM ที่ใช้ตอบคำถาม -----
+# เลือก backend ได้ 2 แบบ ผ่าน .env (แบบเดียวกับ OCR_BACKEND):
+#   "gemini" (ค่าเริ่มต้น) - คุณภาพดีกว่า แต่ free tier ได้แค่ ~20 ครั้ง/วัน/รุ่น และเจอ 503 บ่อย
+#   "ollama" - รันบนเครื่อง ไม่มีโควตา แต่โมเดลเล็กตอบภาษาไทย/อ้างอิงได้แย่กว่าและช้ากว่า
+LLM_BACKEND = os.getenv("LLM_BACKEND", "gemini")  # "gemini" | "ollama"
+OLLAMA_LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "qwen3:4b")
+# context 5 chunk (~1,200 ตัวอักษรต่อชิ้น) + prompt + คำตอบ ภาษาไทยกิน token เยอะ
+# ค่า default ของ Ollama (4096) ไม่พอ จะโดนตัด context เงียบ ๆ แบบเดียวกับที่เจอตอน OCR
+OLLAMA_LLM_NUM_CTX = 16384
+OLLAMA_LLM_TIMEOUT_SECONDS = 300
+
+# ----- Gemini API -----
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+# รุ่นสำรองตอนรุ่นหลักตอบ 429/5xx จน retry หมด (เว้นว่าง = ไม่ใช้รุ่นสำรอง)
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "")
