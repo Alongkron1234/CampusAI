@@ -11,6 +11,14 @@ from campusai.ingest.check import add_check_args, run_check
 from campusai.ingest.pipeline import add_ingest_args, run_ingest
 
 
+def _run_index(args: argparse.Namespace) -> int:
+    # import ตอนเรียกจริง ไม่ import ไว้บนสุดของไฟล์ เพราะ indexer ดึง torch/sentence-transformers
+    # ซึ่งโหลดช้า ไม่อยากให้คำสั่งอื่น (check, ingest, --help) ต้องรอไปด้วย
+    from campusai.retrieval.indexer import run_index
+
+    return run_index(args)
+
+
 def _not_implemented(name: str):
     def _run(args: argparse.Namespace) -> int:
         print(f"[campusai] คำสั่ง '{name}' ยังไม่ได้ implement (ดู docs/PLAN.md)")
@@ -44,6 +52,8 @@ def build_parser() -> argparse.ArgumentParser:
         elif name == "ingest":
             add_ingest_args(sub)
             sub.set_defaults(func=run_ingest)
+        elif name == "index":
+            sub.set_defaults(func=_run_index)
         else:
             sub.set_defaults(func=_not_implemented(name))
 
