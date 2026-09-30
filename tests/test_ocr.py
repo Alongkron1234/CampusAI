@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 import requests
 
 from campusai import config
@@ -314,3 +315,31 @@ def test_ocr_pages_reports_progress_and_cache_status(tmp_path, monkeypatch):
 
     assert result == {1: "cache หน้า 1", 2: "OCR หน้า 2"}
     assert progress_log == [(1, 2, True), (2, 2, False)]
+
+
+def _page_2_always_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "OCR_CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(ocr, "MAX_RETRIES", 1)
+    monkeypatch.setattr(ocr.time, "sleep", lambda _seconds: None)
+
+    def _call(pdf, page):
+        if page == 2:
+            raise ConnectionError("Ollama ไม่ตอบ")
+        return f"หน้า {page}"
+
+    monkeypatch.setattr(ocr, "_call_model", _call)
+    pdf_path = tmp_path / "doc.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake")
+    return pdf_path
+
+
+def test_ocr_pages_skip_failed_continues_to_next_pages(tmp_path, monkeypatch):
+    pdf_path = _page_2_always_fails(tmp_path, monkeypatch)
+    results = ocr.ocr_pages(pdf_path, [1, 2, 3], skip_failed=True)
+    assert results == {1: "หน้า 1", 3: "หน้า 3"}
+
+
+def test_ocr_pages_raises_on_failure_by_default(tmp_path, monkeypatch):
+    pdf_path = _page_2_always_fails(tmp_path, monkeypatch)
+    with pytest.raises(RuntimeError):
+        ocr.ocr_pages(pdf_path, [1, 2, 3])

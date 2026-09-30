@@ -109,3 +109,64 @@ def test_run_index_drops_chunks_removed_from_source(tmp_path, monkeypatch, memor
 
     # recreate=True ต้องล้างของเก่า ไม่ให้ chunk ที่หายไปแล้วยังค้างใน index
     assert memory_client.count(config.QDRANT_COLLECTION).count == 1
+
+
+# ----- Issue #10a: index / ลบทีละเอกสาร -----
+
+TWO_DOCS = ROWS + [
+    {"id": "x1", "doc": "e.pdf", "clause": "ข้อ 1", "chapter": None, "text": "ลาพัก"},
+    {"id": "x2", "doc": "e.pdf", "clause": "ข้อ 2", "chapter": None, "text": "ลาออก"},
+]
+
+
+def _count_doc(client, doc):
+    points, _ = client.scroll(config.QDRANT_COLLECTION, limit=100, with_payload=True)
+    return sum(1 for p in points if p.payload["doc"] == doc)
+
+
+def test_index_only_reindexes_selected_doc_and_keeps_others(
+    tmp_path, monkeypatch, memory_client
+):
+    path = tmp_path / "chunks.jsonl"
+    monkeypatch.setattr(config, "CHUNKS_PATH", path)
+    _write_chunks(path, TWO_DOCS)
+    main(["index"])
+
+    embedded = []
+
+    def _spy_embed(texts):
+        embedded.extend(texts)
+        return _fake_embed(texts)
+
+    monkeypatch.setattr(indexer, "embed_texts", _spy_embed)
+    _write_chunks(path, ROWS + TWO_DOCS[3:4])  # e.pdf ingest ใหม่ เหลือ chunk เดียว
+    assert main(["index", "--only", "e.pdf"]) == 0
+
+    assert len(embedded) == 1  # embed เฉพาะ e.pdf ไม่ embed d.pdf ใหม่
+    assert _count_doc(memory_client, "e.pdf") == 1  # chunk เก่าที่หายไปต้องไม่ค้าง
+    assert _count_doc(memory_client, "d.pdf") == 3  # เอกสารอื่นไม่ถูกแตะ
+
+
+def test_index_only_works_on_empty_store(tmp_path, monkeypatch, memory_client):
+    path = tmp_path / "chunks.jsonl"
+    monkeypatch.setattr(config, "CHUNKS_PATH", path)
+    _write_chunks(path, TWO_DOCS)
+
+    assert main(["index", "--only", "e.pdf"]) == 0
+    assert memory_client.count(config.QDRANT_COLLECTION).count == 2
+
+
+def test_remove_command_deletes_doc_everywhere(tmp_path, monkeypatch, memory_client):
+    processed = tmp_path / "processed"
+    processed.mkdir()
+    monkeypatch.setattr(config, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(config, "PROCESSED_DIR", processed)
+    monkeypatch.setattr(config, "CHUNKS_PATH", processed / "chunks.jsonl")
+    _write_chunks(config.CHUNKS_PATH, TWO_DOCS)
+    main(["index"])
+
+    assert main(["remove", "e.pdf"]) == 0
+
+    assert _count_doc(memory_client, "e.pdf") == 0
+    assert _count_doc(memory_client, "d.pdf") == 3
+    assert {c.doc for c in indexer.load_chunks()} == {"d.pdf"}
