@@ -107,6 +107,15 @@ def process_file(
     ยังไม่ index ให้ ผู้เรียกต้องสั่ง index ต่อเอง (CLI: `campusai index --only`, API: ทำให้อัตโนมัติ)
     """
     result = ingest_single_file(pdf_path, force_ocr, verbose, on_progress)
+    save_result(pdf_path, result)
+    return result
+
+
+def save_result(pdf_path: Path, result: IngestResult) -> None:
+    """บันทึกผล ingest ของไฟล์เดียว: chunks.jsonl + .md + ทะเบียน
+
+    แยกจาก process_file ให้ API ล็อกเฉพาะช่วงเขียนไฟล์ (สั้น) ไม่ต้องล็อกตลอดช่วง OCR (นาน)
+    """
     write_chunks({result.doc: result.chunks})
     write_debug_markdown(result.doc, result.chunks)
     registry.save_record(
@@ -119,7 +128,6 @@ def process_file(
             chunks=len(result.chunks),
         )
     )
-    return result
 
 
 def remove_document(doc_name: str, delete_pdf: bool = False) -> None:

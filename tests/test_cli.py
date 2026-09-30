@@ -6,7 +6,7 @@ def test_help_lists_all_commands(capsys):
     subparsers_action = next(
         action for action in parser._subparsers._group_actions if action.dest == "command"
     )
-    expected = {"check", "ingest", "index", "remove", "search", "ask", "chat", "eval"}
+    expected = {"check", "ingest", "index", "remove", "serve", "search", "ask", "chat", "eval"}
     assert set(subparsers_action.choices.keys()) == expected
 
 

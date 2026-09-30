@@ -49,7 +49,9 @@ def get_client() -> QdrantClient:
         return QdrantClient(url=config.QDRANT_URL, api_key=config.QDRANT_API_KEY)
 
     config.QDRANT_PATH.mkdir(parents=True, exist_ok=True)
-    return QdrantClient(path=str(config.QDRANT_PATH))
+    # API (Issue #10b) เรียก client ตัวเดียวจากหลาย thread (request + worker) โดยคุมด้วย lock เอง
+    # ต้องปิดการเช็คว่าเรียกจาก thread เดียวกับที่สร้างของ SQLite ที่ Qdrant local ใช้ข้างใน
+    return QdrantClient(path=str(config.QDRANT_PATH), force_disable_check_same_thread=True)
 
 # เหมือนเป็นตู้เก็บ vector ของ chunk ทั้งหมดใน Qdrant (เหมือน table ใน database)
 def ensure_collection(client: QdrantClient, recreate: bool = False) -> None:

@@ -20,6 +20,12 @@ def _run_index(args: argparse.Namespace) -> int:
     return run_index(args)
 
 
+def _run_serve(args: argparse.Namespace) -> int:
+    from campusai.api.app import run_serve
+
+    return run_serve(args)
+
+
 def _run_remove(args: argparse.Namespace) -> int:
     from campusai.retrieval.indexer import run_remove
 
@@ -81,6 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
         "ingest": "แปลง PDF -> chunks.jsonl (Issue #2, #3)",
         "index": "สร้าง vector index + BM25 index จาก chunks.jsonl (Issue #5)",
         "remove": "ลบเอกสารออกจาก chunks.jsonl และ index (Issue #10a)",
+        "serve": "เปิด Web API (FastAPI) สำหรับหน้าเว็บ (Issue #10b)",
         "search": "ค้นหา chunk ที่เกี่ยวข้องกับคำถาม (Issue #6)",
         "ask": "ถามคำถามครั้งเดียวแล้วรับคำตอบ (Issue #7)",
         "chat": "โหมดถาม-ตอบต่อเนื่องใน terminal (Issue #7)",
@@ -101,6 +108,10 @@ def build_parser() -> argparse.ArgumentParser:
                 help="index ใหม่เฉพาะเอกสารที่ระบุ (ไม่ใส่ = สร้างใหม่ทั้งหมด)",
             )
             sub.set_defaults(func=_run_index)
+        elif name == "serve":
+            sub.add_argument("--host", default="127.0.0.1", help="ค่าเริ่มต้น 127.0.0.1 (เครื่องนี้เท่านั้น)")
+            sub.add_argument("--port", type=int, default=8000)
+            sub.set_defaults(func=_run_serve)
         elif name == "remove":
             sub.add_argument("docs", nargs="+", metavar="ไฟล์", help="ชื่อไฟล์ .pdf ที่จะลบ")
             sub.add_argument(
