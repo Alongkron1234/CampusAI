@@ -20,6 +20,19 @@ def load_questions(path: Path = config.EVAL_QUESTIONS_PATH) -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
+def load_eval_questions(path: Path | None, allow_test_set: bool = False) -> list[dict]:
+    """โหลดชุดคำถามสำหรับคำสั่ง eval (ค่าเริ่มต้น = dev set) และกันการเผลอใช้ test set
+
+    test set ต้องวัดครั้งเดียวหลังปรับจูนเสร็จ ถ้าเปิดดูผลระหว่างปรับจูน ตัวเลขจะ overfit เหมือน dev set
+    """
+    path = path or config.EVAL_QUESTIONS_PATH
+    if path.resolve() == config.EVAL_TEST_QUESTIONS_PATH.resolve() and not allow_test_set:
+        raise ValueError(
+            "test set ถูกล็อกไว้ใช้วัดครั้งเดียวหลัง Issue #9 ถ้าตั้งใจจะวัดจริงให้ใส่ --allow-test-set"
+        )
+    return load_questions(path)
+
+
 def load_known_clauses(chunks_path: Path = config.CHUNKS_PATH) -> set[tuple[str, str | None]]:
     """คืนเซ็ตของ (doc, clause) ที่มีอยู่จริงใน chunks.jsonl ไว้เทียบว่าคำถามอ้างอิงถูกไหม"""
     known: set[tuple[str, str | None]] = set()

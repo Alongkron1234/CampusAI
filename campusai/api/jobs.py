@@ -7,6 +7,8 @@
 ระหว่าง running มี stage/done/total บอกความคืบหน้า เช่น stage="ocr", done=12, total=30
 """
 
+from __future__ import annotations
+
 import sqlite3
 import threading
 import uuid

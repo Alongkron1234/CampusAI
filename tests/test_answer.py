@@ -14,7 +14,7 @@ def _r(chunk_id: str, clause: str = "ข้อ 1", text: str = "เนื้อ�
 
 @pytest.fixture(autouse=True)
 def _no_real_gemini(monkeypatch):
-    def _fail(prompt, model):
+    def _fail(prompt, model, system):
         raise AssertionError("test ต้อง mock _call_gemini ห้ามเรียก Gemini จริง")
 
     def _fail_http(*args, **kwargs):
@@ -33,7 +33,7 @@ def _mock_gemini(monkeypatch, *replies):
     queue = list(replies)
     prompts: list[str] = []
 
-    def _fake(prompt, model):
+    def _fake(prompt, model, system):
         prompts.append(model)
         reply = queue.pop(0)
         if isinstance(reply, Exception):

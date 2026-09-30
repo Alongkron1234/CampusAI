@@ -6,6 +6,7 @@
 
 import argparse
 import sys
+from pathlib import Path
 
 from campusai.ingest.check import add_check_args, run_check
 from campusai.ingest.pipeline import add_ingest_args, run_ingest
@@ -57,12 +58,13 @@ def _add_top_k_arg(parser: argparse.ArgumentParser) -> None:
 
 
 def _run_eval(args: argparse.Namespace) -> int:
-    from campusai.evaluation.retrieval_eval import run_eval_retrieval
-
     if args.target == "retrieval":
+        from campusai.evaluation.retrieval_eval import run_eval_retrieval
+
         return run_eval_retrieval(args)
-    print(f"[campusai] eval {args.target!r} ยังไม่ได้ implement (Issue #8)")
-    return 1
+    from campusai.evaluation.answer_eval import run_eval_answers
+
+    return run_eval_answers(args)
 
 
 def _not_implemented(name: str):
@@ -129,6 +131,15 @@ def build_parser() -> argparse.ArgumentParser:
             sub.set_defaults(func=_run_chat)
         elif name == "eval":
             sub.add_argument("target", choices=["retrieval", "answers"], help="สิ่งที่จะวัดผล")
+            sub.add_argument(
+                "--questions", type=Path, default=None,
+                help="ไฟล์ชุดคำถาม (ค่าเริ่มต้น eval/questions.jsonl = dev set)",
+            )
+            sub.add_argument(
+                "--allow-test-set", action="store_true",
+                help="ยอมให้ใช้ test set ที่ล็อกไว้ (ใช้ครั้งเดียวหลัง Issue #9 เท่านั้น)",
+            )
+            sub.add_argument("--limit", type=int, default=0, help="วัดแค่ N ข้อแรก (ไว้ลองระบบ)")
             sub.set_defaults(func=_run_eval)
         else:
             sub.set_defaults(func=_not_implemented(name))

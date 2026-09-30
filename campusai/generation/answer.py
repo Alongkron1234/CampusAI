@@ -77,7 +77,7 @@ def extract_citations(text: str, n_contexts: int) -> list[int]:
     return cited
 
 
-def _call_gemini(prompt: str, model: str) -> str:
+def _call_gemini(prompt: str, model: str, system: str) -> str:
     """เรียก Gemini 1 ครั้ง (ไม่มี retry) แยกออกมาให้ mock ใน test ได้ง่าย"""
     if not config.GEMINI_API_KEY:
         raise RuntimeError("ยังไม่ได้ตั้งค่า GEMINI_API_KEY ใน .env")
@@ -86,7 +86,7 @@ def _call_gemini(prompt: str, model: str) -> str:
         model=model,
         contents=prompt,
         config=genai_types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=system,
             temperature=TEMPERATURE,
             # ไม่ได้ใช้ function calling ปิดไว้ (ไม่งั้น SDK พิมพ์คำเตือนทุกครั้งที่เรียก)
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
@@ -100,10 +100,10 @@ def _is_daily_quota(exc: genai_errors.APIError) -> bool:
     return exc.code == 429 and "PerDay" in str(exc)
 
 
-def _call_model_with_retry(prompt: str, model: str) -> str:
+def _call_model_with_retry(prompt: str, model: str, system: str) -> str:
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            return _call_gemini(prompt, model)
+            return _call_gemini(prompt, model, system)
         except genai_errors.APIError as exc:
             # retry แต่ละครั้งก็นับโควตา จึงไม่ retry กรณีที่ลองใหม่แล้วไม่มีทางหาย
             if exc.code not in RETRYABLE_STATUS or _is_daily_quota(exc) or attempt == MAX_RETRIES:
@@ -114,18 +114,18 @@ def _call_model_with_retry(prompt: str, model: str) -> str:
     raise AssertionError("unreachable")
 
 
-def _call_gemini_with_retry(prompt: str) -> str:
+def _call_gemini_with_retry(prompt: str, system: str) -> str:
     """retry รุ่นหลัก ถ้ายังล่ม (429/5xx) และตั้ง GEMINI_FALLBACK_MODEL ไว้ ให้ลองรุ่นสำรองต่อ
 
     ทดสอบจริงพบว่ารุ่นหลักตอบ 503 (โหลดเต็ม) ติดกันหลายนาทีได้ ซึ่ง retry รุ่นเดิมไม่ช่วย
     """
     try:
-        return _call_model_with_retry(prompt, config.GEMINI_MODEL)
+        return _call_model_with_retry(prompt, config.GEMINI_MODEL, system)
     except genai_errors.APIError as exc:
         if exc.code not in RETRYABLE_STATUS or not config.GEMINI_FALLBACK_MODEL:
             raise
         print(f"[campusai] {config.GEMINI_MODEL} ไม่พร้อม เปลี่ยนไปใช้ {config.GEMINI_FALLBACK_MODEL}")
-        return _call_model_with_retry(prompt, config.GEMINI_FALLBACK_MODEL)
+        return _call_model_with_retry(prompt, config.GEMINI_FALLBACK_MODEL, system)
 
 
 # Ollama ปล่อยโมเดลออกจากหน่วยความจำหลังว่าง 5 นาที (ค่าเริ่มต้น) ยืดไว้ให้ถามต่อได้โดยไม่ต้องโหลดใหม่
@@ -135,7 +135,7 @@ OLLAMA_KEEP_ALIVE = "30m"
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
-def _call_ollama(prompt: str) -> str:
+def _call_ollama(prompt: str, system: str) -> str:
     """เรียก LLM บนเครื่องผ่าน Ollama native API (/api/chat เพราะรับ num_ctx ได้จริง)
 
     ไม่ต้อง retry แบบ Gemini เพราะไม่มีโควตาหรือ server โหลดเต็ม ถ้าล้มแปลว่า Ollama ไม่ได้เปิด
@@ -144,7 +144,7 @@ def _call_ollama(prompt: str) -> str:
     payload = {
         "model": config.OLLAMA_LLM_MODEL,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ],
         "options": {"temperature": TEMPERATURE, "num_ctx": config.OLLAMA_LLM_NUM_CTX},
@@ -174,11 +174,11 @@ def warm_up() -> None:
     ).raise_for_status()
 
 
-def call_llm(prompt: str) -> str:
-    """เรียก LLM ตาม config.LLM_BACKEND"""
+def call_llm(prompt: str, system: str = SYSTEM_PROMPT) -> str:
+    """เรียก LLM ตาม config.LLM_BACKEND (system ใช้ prompt อื่นได้ เช่น prompt กรรมการใน answer_eval)"""
     if config.LLM_BACKEND == "ollama":
-        return _call_ollama(prompt)
-    return _call_gemini_with_retry(prompt)
+        return _call_ollama(prompt, system)
+    return _call_gemini_with_retry(prompt, system)
 
 
 def generate_answer(question: str, results: list[SearchResult]) -> Answer:
